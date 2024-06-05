@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+	<title>Tidal River Flow Simulator</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="keywords" content="TIdal, River, Tides, Flow, paddling, canoe, surfski, Brisbane, Gold Coast, Australia">
+	<meta name="description" content="Tidal River Flow simulates current flows in the rivers and estuaries of SouthEast Queensland, for boating, paddling, rowing and other water activities.">
+	<meta name="author" content="Devon Matsalla">
+	<meta property="og:title" content="Tidal River Flow Simulator">
+	<meta property="og:description" content="Tidal River Flow simulates current flows in the rivers and estuaries of SouthEast Queensland, for boating, paddling, rowing and other water activities.">
+	<meta property="og:image" content="https://spearers.com.au/images/westendspearers.jpg?v=1">
+	<meta property="og:url" content="https://spearers.com.au/rivers.html">
+	<meta property="og:type" content="website">
+	<meta name="twitter:card" content="summary_large_image">
+	<link rel="icon" type="image/x-icon" href="../images/spearers.ico">
+	<link rel="canonical" href="https://spearers.com.au/rivers/rivers.html">
+	<link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+	<!-- CSS styles code -->
+	<link rel='stylesheet' type='text/css' href='riverstyles.css?v=1'>
+</head>
+
+<body>
+
+	<div id='title-bar'>
+		<a href="/"><img src="../images/SpearersLogoClearDark.png" alt="Logo" width="100"></a>
+		<h1 style='font-size:20px;' hidden>RiverNav</h1>
+		<span id='test'></span>
+		<button onclick="openFullscreen();">Fullscreen</button>
+<!--		Tide is <span id='tideStats'></span>
+		Wind is from <span id='windDir'>---</span>° at <span id='windSpd'>-</span> kph, temperature <span id='temp'>--</span>°C, precipitation <span id='precip'>-</span> mm. 
+-->
+		<div class='controlPanel' style='text-align:center;'>
+			<label>Speed <input type='checkbox' id='toggle-speed' checked></label>
+			<label>Tides <input type='checkbox' id='toggle-tides' checked></label>
+			<label>Follow <input type='checkbox' id='toggle-follow'></label>
+		</div>
+	</div>
+	<div id='content'>
+		<div id='speedCanvas' class='canvas'>
+			<div><span style='font-size:0.3em;'>Speed: </span><span id='speed-display'>0 km/h</span></div>
+			<div><span style='font-size:0.3em;'>TOD: </span><span id='time-display'>--:--:--</span></div>
+			<div><span style='font-size:0.3em;'>Dist: </span><span id='distance-display'>0.00 km</span></div>
+			<div><span style='font-size:0.3em;'>Elapsed: </span><span id='elapsed-display'>0:00:00</span></div>
+		</div>
+		<div id='mapContainer'>
+			<div id='map'></div>
+			<canvas id='overlayCanvas'></canvas>
+		</div>
+		<div id='canvasScroll' class='canvas'>
+			<canvas id='myCanvas' width='7200'></canvas>
+		</div>
+	</div>
+
+	<script>
+	//here, set up all of our variables
+
+	var loc = 'breakfast';
+	const toggleSpeed = document.getElementById('toggle-speed');
+	const toggleTides = document.getElementById('toggle-tides');
+	const toggleFollow = document.getElementById('toggle-follow');
+	const speedCanvas = document.getElementById('speedCanvas');
+	const tidesCanvas = document.getElementById('canvasScroll');
+	const myCanvas = document.getElementById('myCanvas');
+	const mapContainer = document.getElementById('mapContainer');
+	const overlayCanvas = document.getElementById('overlayCanvas');
+	const speedDisplay = document.getElementById('speed-display');
+	const timeDisplay = document.getElementById('time-display');
+	const elapsedDisplay = document.getElementById('elapsed-display');
+	const distanceDisplay = document.getElementById('distance-display');
+	// Create a canvas overlay aligned with the map
+	const ctxm = overlayCanvas.getContext('2d');
+
+	let userPosition = null;
+	let userSpeed = 0;
+	let userHeading = 0;
+	let isFollowing = false;
+	let startTime = new Date();	//*what does this do?
+	let selectTime = 0;
+	let trail = [];
+
+	//need to set these up from a php call
+	let meteo = false;
+	let river = false;
+	let forecast;
+	let windDirNow = 0;
+	let windSpdNow = 0;
+	let tempNow = 0;
+	let precipNow = 0;
+	let riverData;
+		
+	</script>
+	
+	<!-- Load in Leaflet maps scripts and plot map -->
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"> 
+	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script> 
+	<script src="https://cdn.jsdelivr.net/npm/polyline-encoded@0.0.9/Polyline.encoded.min.js"></script> 
+
+	<script> 
+		var tide_loc = []; 
+		var coords,url,delta,adjust;
+		var tide_list = [];
+	</script>
+	<script src='../tide_list.js?v=1'></script>   <!-- 0=westend,1=breakfast,2=coomera,3=manly,4=noosa -->
+	<script src='riverMap.js?v=1'></script>
+
+	<!-- load in my spearers scripts and set up the tides -->
+	<script src="../suncalc.js"></script>
+	<script src='../tides.js?v=1'></script>
+	<script src='toggleSetup.js'></script>
+	<script>
+	//in this section, setup the canvases and toggles, then draw the tides canvas
+
+	myCanvas.setAttribute('height', tidesCanvas.clientHeight);
+//	myCanvas.height = tidesCanvas.clientHeight;
+
+		//display all data from javascript files
+		adjustTides();	  //add a timestamp field, and add/subtract a bit to adjust tides for current (change this per location)
+		drawCurve(coords, false);		//populate the tides canvas - functions in tides.js
+		tidesCanvas.scrollLeft = myCanvas.width * 6.66 / 20;		//adjust scrollbar
+
+		updateLayout();		//readjust the canvas heights as a function of changes to toggles
+		updatePosition();	//activate the GPS position tracking, with highAccuracy
+		overlayCanvas.width = overlayCanvas.clientWidth;	//I need this, else canvas can be stretched
+		overlayCanvas.height = overlayCanvas.clientHeight;
+
+		//when toggles change, redraw the tides canvas
+		toggleSpeed.addEventListener('change', updateLayout);
+		toggleTides.addEventListener('change', updateLayout);
+		toggleFollow.addEventListener('change', () => {
+			isFollowing = toggleFollow.checked;
+			if (isFollowing && userPosition) {
+				map.setView(userPosition);
+			}
+		});
+
+		window.onresize = () => {
+			overlayCanvas.width = overlayCanvas.clientWidth;	//I need this otherwise canvas gets stretched
+			overlayCanvas.height = overlayCanvas.clientHeight;
+			myCanvas.setAttribute('height', tidesCanvas.clientHeight);
+			drawCurve(coords, false);		//redraw tides canvas
+		}
+
+function openFullscreen() {
+var elem = document.documentElement;
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen();
+  } else if (elem.webkitRequestFullscreen) { /* Safari */
+    elem.webkitRequestFullscreen();
+  } else if (elem.msRequestFullscreen) { /* IE11 */
+    elem.msRequestFullscreen();
+  }
+}
+	</script>
+	<script src='setupFlowAreas.js?v=2'></script>
+	<script src='rivers.js?v=3'></script>
+	<script src='riverPoints.js?v=3'></script>
+	<script src='tide_stations.js?v=3'></script>
+	<script>
+		// in this section, setup and draw the Flows and the Barbs, and manage all animations and actions on window changes
+
+		const currentDate = new Date();
+		var t = currentDate.getTime();
+		var tideHeightSpd = -Math.round((tideHeight(t + 1*3600*1000) - tideHeight(t))*100)*10;	// mm/hr
+		var msg = (tideHeightSpd  < -100) ? 'INCOMING' : (tideHeightSpd  > 100) ? 'OUTGOING' : 'NEUTRAL';
+//		document.getElementById('tideStats').innerHTML = Math.round(tideHeight(t)*10)/10 + ' m ' + msg + ' at ' + Math.abs(tideHeightSpd) + ' mm/hr.';
+		
+		//load the riverPoints array to plot the flows
+		var riverPoints = JSON.parse(loadStr);
+
+		//river Flows constants
+		const numFlows = 400; // Number of flows in the simulation
+		const flowFactor = 10; // Factor to determine progression incremenet of the arc based on flow speed
+		const flowDuration = 2;  //seconds
+		//wind barbs constants
+		const numBarbs = 400;  //Number of windbarbs in the simulation
+		const barbSpdFactor = 5;
+		const barbLenFactor = 3;
+		const barbDuration = 2; //seconds
+
+		//populate this array with all quadrangles, directions, maxFlow, tideStns... everything we need to plot the animations, then we won't need to use riverPoints anymore
+		var ctxAreas = [];  
+		var flows = [];  // Array to hold river flow objects
+		var barbs = [];  // Array to hold wind barb objects
+
+		// Function to update and redraw flows and barbs at a specified interval
+		function animate() {
+			ctxm.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+			updateFlowPositions(); // Update river flow positions
+			updateBarbPositions(); // Update wind barb positions
+			drawFlows(); // Redraw flows
+			drawBarbs();
+			drawOverlay();
+			requestAnimationFrame(animate); // Request next animation frame
+		}
+
+		setupFlowAreas();	// Populate the ctxAreas array with all info we need to run the animations
+		initializeFlows();	// Initialize flows and barbs and start animation
+		InitializeBarbs();
+		animate();
+
+		// Once done loading, load the weather and the river heights
+		window.onload = function() {
+			fetchWxData();   // error: the php file is in the root dir, not the rivers
+			fetchRiverHeights();
+		};
+
+		// Event listener for click on any marker
+		map.on('click', function(e) {
+			const latlng = e.latlng;
+			const [dir, spd, stn] = getSpd(latlng);
+			if (stn && stn !== loc) {
+				loc = stn;
+				getLocInfo();
+				adjustTides();
+				drawCurve(coords, false);
+			}
+			// Create a popup with the latitude and longitude
+			L.popup().setLatLng(latlng).setContent(latlng.toString() + "<br>spd= " + spd + "<br>stn= " + stn).openOn(map);
+		});
+		
+		// Event listener for click on the drawCurve
+		myCanvas.addEventListener('click', (e) => {
+			const rect = myCanvas.getBoundingClientRect();
+			selectTime = (e.clientX - rect.left) / myCanvas.clientWidth;
+			if (selectTime > 0.349 && selectTime < 0.351) {
+				selectTime = 0;
+				let now = Date.now();
+				tideHeightSpd = -Math.round((tideHeight(now + 1*3600*1000) - tideHeight(now))*100)*10;	// mm/hr
+			}
+			// figure out selectTime in timestamp
+			document.getElementById('test').innerHTML = selectTime;
+			drawCurve(coords, false);
+		});
+
+		// Call the functions to plot the tide and river stations
+		plotStations(tide_stations);
+		plotStations(river_stations);
+
+	</script>
+</body>
+</html>

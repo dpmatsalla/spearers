@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Tidal River Visualisation</title>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+	<style>
+		h1 {padding: 0px;font-size: 20px; }
+		#map { position: absolute; top: 80px; left: 0; width: 100%; z-index: 0; }
+		#overlayCanvas { position: absolute; top: 80px; left: 0; z-index: 1; pointer-events: none; }
+		.tooltip { color: black; background: none; border: none; box-shadow: none; padding: 0; }
+
+		.lasso-control {
+			background-color: white;
+			padding: 5px;
+			cursor: pointer;
+		}
+		.lasso-control.active {
+			background-color: lightgreen;
+		}
+	</style>
+</head>
+<body>
+	<table width="100%"><tr>
+		<td><h1>Tidal river map</h1></td>
+		<td><p id="text">text</p></td>
+		<td><button onclick='saveRiverPoints()'>Save riverPoints</button></td>  <!-- make these hidden when not in setup mode-->
+	</tr></table>
+	<div id="map"></div>
+	<canvas id="overlayCanvas"></canvas>
+
+	<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+	<script>
+		const mapHeight = window.innerHeight - 100;
+		var mapContainer = document.getElementById('map');
+		mapContainer.style.height = `${mapHeight}px`;
+	
+		// Initialize Leaflet map
+		const map = L.map('map', {
+			center: [-27.5, 153],
+			zoom: 14,
+			preferCanvas: true,
+			doubleClickZoom: false // Disable double-click zoom
+		});
+
+		var std = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+		});
+		var streets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+			'attribution':'google Streets',
+			'maxZoom':20,
+			'minZoom':0,
+			'subdomains':['mt0','mt1','mt2','mt3'],
+		}).addTo(map);
+		var satellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+			'attribution':'google Satellite',
+			'maxZoom':20,
+			'minZoom':0,
+			'subdomains':['mt0','mt1','mt2','mt3'],
+		});
+		
+		var riverGroup = L.layerGroup().addTo(map);
+		var stnGroup = L.layerGroup();
+		var baseLayers = {
+			"OpenStreets": std,
+			"Streets": streets,
+			"Satellite": satellite
+		};		// Define base layers and overlay
+		var overlays = {
+			"River Markers": riverGroup,
+			"Tide Stations": stnGroup
+		};
+		L.control.layers(baseLayers, overlays).addTo(map);		// Add layer control to the map
+	</script>
+	<script src='setupFlowAreas.js?v=3'></script>
+	<script src='riversetup.js?v=3'></script>
+	<script src='riverPoints.js?v=3'></script>
+	<script src='tide_stations.js?v=3'></script>
+
+	<script src="https://unpkg.com/leaflet-lasso"></script>
+
+	<script>
+		//riversetup stuff
+		var riverPoints, circleMarkers, tooltips;
+		var loadPoints = JSON.parse(loadStr);
+
+		//populate this array with all quadrangles, directions, maxFlow, tideStns... everything we need to plot the animations, then we won't need to use riverPoints anymore
+		var ctxAreas = [];  
+
+		resetMap();
+
+		document.getElementById('text').innerHTML = riverPoints.length + 'pts';
+
+		// Handle Leaflet map double-click events
+		map.on('dblclick', function(event) {
+			addPoint(event);
+
+			// Focus on the input field after the popup is opened
+			setTimeout(() => document.getElementById("riverWidth").select(), 200); // Delay to ensure the input field is rendered before focusing
+
+			setupFlowAreas();
+			drawQuads();
+		});
+
+		// Event listener for click on any marker
+		map.on('click', function(e) {
+			var lassoControl = document.querySelector('.lasso-control');
+			if (!lassoControl.classList.contains('active')) {
+				// Find the clicked marker (if any)
+				map.eachLayer(function(layer) {
+					if (layer instanceof L.Marker && layer.getLatLng().equals(e.latlng)) {
+						// Open the popup of the clicked marker
+						layer.openPopup();
+					}
+				});
+			}
+		});
+
+		// Initialize canvas overlay
+		const overlayCanvas = document.getElementById('overlayCanvas');
+		const ctxm = overlayCanvas.getContext('2d');
+
+		window.onresize = alignCanvas;
+
+		// Align the canvas again
+		alignCanvas();
+
+		// Initial drawing on canvas, and populate the ctxAreas array with all info we need to run the animations
+		setupFlowAreas();
+		drawQuads();
+		
+		var lasso = L.lasso(map, {intersect: true});
+
+		map.on("mouseup", function() {
+			var lassoControl = document.querySelector('.lasso-control');
+			if (!lassoControl.classList.contains('active')) {
+				//we've just dragged a riverPoint
+				map.dragging.enable();
+				map.off("mousemove");
+				setupFlowAreas();	//because riverPoints has changed after a drag
+				drawQuads();
+			}
+		});
+		// Redraw canvas when map is moved or zoomed
+		map.on('move zoom', () => { 
+			drawQuads();
+		}); 		//match the canvas boxes to the new map position
+
+		// Add an event listener for the lasso selection
+		map.on('lasso.finished', function(e) {
+			var selectedMarkers = e.layers;
+			// Change attributes of the selected markers
+			var newSpd = prompt("Enter new spd for selected markers:", 2);
+			var newStn = prompt("Enter new stn for selected markers:", "westend");
+			selectedMarkers.forEach(function(layer) {
+				var markerLatLng = layer.getLatLng();
+				riverPoints.forEach(function(point) {
+					if (point.latlng.lat == markerLatLng.lat && point.latlng.lng == markerLatLng.lng) {
+						point.v = newSpd;
+						point.stn = newStn;
+						let g = markerColor(point.stn);
+						layer.setStyle({ color: g, fillColor: g });
+					}
+				});		
+			});
+			setupFlowAreas();
+			drawQuads();
+			var lassoControl = document.querySelector('.lasso-control');
+			lassoControl.classList.remove('active');
+		});
+
+		// Add a custom control for toggling the lasso functionality
+		var LassoControl = L.Control.extend({
+			options: {
+				position: 'bottomright'
+			},
+			onAdd: function(map) {
+				var container = L.DomUtil.create('div', 'lasso-control');
+				container.innerHTML = 'Select Markers';
+				container.onclick = function() {
+					if (container.classList.contains('active')) {
+						container.classList.remove('active');
+						lasso.disable();
+						map.dragging.enable();
+					} else {
+						container.classList.add('active');
+						lasso.enable();
+						map.dragging.disable();
+					}
+				};
+				return container;
+			}
+		});
+		map.addControl(new LassoControl());
+
+		// Ensure lasso is disabled initially and map panning is enabled
+		lasso.disable();
+		map.dragging.enable();
+
+		// Call the functions to plot the tide and river stations
+		plotStations(tide_stations);
+		plotStations(river_stations);
+
+	</script>
+</body>
+</html>
