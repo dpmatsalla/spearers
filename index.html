@@ -1,0 +1,422 @@
+<!--
+To do:
+-RiverNav Page
+	*-have a toggle for north up or track up.  use leaflet-rotate  or mapbox?
+	-Have a toggle to allow user to create a route for kayak to follow, and calculate total time to do it, noting tide currents, wind resistance, etc.
+	-in tides.js, reapply adjust to adjustTides, avoiding cumulative effect
+	-change tide station names to BrisbaneBar, BrisbanePortOffice, etc
+	-update station names based on proximity to riverHeights stations (with corresponding adjust variable)
+	-change the riverPoints data to update all the tideStns to 1=westend,2=coomera,etc
+	-make wind appear on map, and update wind barbs when click on drawCurve
+*-Find bathymetric GeoJSON and integrate into Leaflet (or Mapbox)
+	-https://ecat.ga.gov.au/geonetwork/srv/eng/catalog.search#/metadata/148758
+*-can I download wind from mutiple places in open-meteo, and plot it across the map (like flows, as a function of location)
+-on map plot all locations of river speed measurements: https://www.data.qld.gov.au/dataset/brisbane-river-colmslie-site-water-quality-monitoring-buoy, https://www.data.qld.gov.au/dataset/brisbane-river-moggill-reach-site-water-quality-monitoring-buoy
+-Training plans, ie. Intervals
+-Reviews of equipment and skis
+-Paddling tips and resources, safety guidelines, tips
+-draw animated ferry leaving at 5am
+-Blog or news updates (ie. Cheese dates, AGM dates, etc)
+-Member profiles
+-Strava leaderboards standings, links
+
+References:
+-https://www.data.qld.gov.au/dataset/brisbane-bar-tide-gauge-predicted-interval-data/resource/8a5a5e32-2ed4-4252-8c2a-074188556d5b
+-https://www.data.qld.gov.au/dataset/?q=tide&page=3
+-->
+
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Spearers Brisbane Kayaking Club</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="keywords" content="West End, Spearers, kayak, kayaking, canoe, surfski, ocean ski, paddling, Brisbane, Queensland, Australia">
+    <meta name="description" content="The Spearers promote fitness and health by paddling on the Brisbane River three times per week, paddling surfskis, ocean skis and k1 kayaks.">
+    <meta name="author" content="Devon Matsalla">
+    <meta property="og:title" content="Spearers Brisbane Kayaking Club">
+    <meta property="og:description" content="The Spearers promote fitness and health by paddling on the Brisbane River from West End in surfskis and K1 kayaks.">
+    <meta property="og:image" content="https://spearers.com.au/images/westendspearers.jpg?v=1">
+    <meta property="og:url" content="https://spearers.com.au/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/x-icon" href="/images/spearers.ico">
+    <link rel="canonical" href="https://spearers.com.au/">
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+    <!-- Bootstrap scripts -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script type="text/javascript" id="www-widgetapi-script" src="https://www.youtube.com/s/player/0af6e327/www-widgetapi.vflset/www-widgetapi.js" async=""></script>
+	<script type="text/javascript" async="" src="https://www.youtube.com/iframe_api"></script>
+	<script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DCTFTXWM6&amp;l=dataLayer&amp;cx=c"></script>
+	<script async="" src="https://www.googletagmanager.com/gtm.js?id=GTM-KN8CB3QJ"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- CSS styles code -->
+    <link rel="stylesheet" type="text/css" href="styles.css?v=9">
+    <style>
+        #banner { width: 100%; height: 200px; overflow: hidden; position: relative; }
+        #photo-container { position: absolute; top: 0; right: 0; width: auto; height: 100%; white-space: nowrap; animation: pan 60s linear infinite; }
+        #photo-container img { height: 100%; width: auto; max-width: 100%; object-fit: cover; display: inline-block; }
+        @keyframes pan { 0% { transform: translateX(50%); } 100% { transform: translateX(-800%); } }
+    </style>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3DCTFTXWM6"></script>
+    <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-3DCTFTXWM6'); </script>
+</head>
+<body>
+	<!-- Google Tag Manager (noscript) -->
+	<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KN8CB3QJ"
+	height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+	<!-- End Google Tag Manager (noscript) -->
+
+    <header class="darkbg">
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/"><img src="images/SpearersLogoClearDark.png" alt="Logo" width="250"></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#collapsibleNavbar">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="collapsibleNavbar">
+                    <ul class="navbar-nav">
+                        <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/#tides">Tides</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/#calendarsection">Calendar</a></li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="cheese.php" role="button" data-bs-toggle="dropdown">Cheese</a>
+                            <ul class="dropdown-menu dropdown-menu-dark">
+                                <li><a class="dropdown-item" href="cheese.php">The Cheese</a></li>
+                                <li><a class="dropdown-item" href="cheese.php#athletes">The Spearers</a></li>
+                                <li><a class="dropdown-item" href="cheese.php#commandments">Commandments</a></li>
+                                <li><a class="dropdown-item" href="cheese.php#rules">Rules</a></li>
+                                <li><a class="dropdown-item" href="nedshead.html">The Ned's Head</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item"><a class="nav-link" href="photos.php#home">Photos</a></li>
+                        <li class="nav-item"><a class="nav-link" href="https://www.youtube.com/playlist?list=PLxnQwdP4r1G8aTyuQsoQxMA-D4L1QogBm">Videos</a></li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="AGM.php" role="button" data-bs-toggle="dropdown">AGM</a>
+                            <ul class="dropdown-menu dropdown-menu-dark">
+                                <li><a class="dropdown-item" href="AGM.php">AGM</a></li>
+                                <li><a class="dropdown-item" href="AGM.php#tshirts">T-shirts</a></li>
+                                <li><a class="dropdown-item" href="AGM.php#gallery">AGM Photos</a></li>
+                                <li><a class="dropdown-item" href="AGM.php#mapsection">Map</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item"><a class="nav-link" href="/rivers/rivers.html">Nav</a></li>
+                        <li class="nav-item"><a class="nav-link" href="physics.html">Physics</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/#contact">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        <div class="youtube-container">
+            <iframe id="video" src="https://www.youtube.com/embed/videolist?autoplay=1&amp;mute=1&amp;loop=1&amp;color=white&amp;controls=0&amp;modestbranding=1&amp;playsinline=1&amp;rel=0&amp;enablejsapi=1&amp;playlist=qzhuTbeSdmA,Si_rMKizybo,LshkeyyIRcQ,ifeNFz36jqI" title="20211215-Spearers Brisbane River" frameborder="0" allowfullscreen="" data-gtm-yt-inspected-9="true"></iframe>
+        </div>
+    </header>
+    
+    <script type="text/javascript">
+        function redirect() {
+            // Redirect to the same site with the chosen attribute
+            window.location.href = window.location.pathname + "?loc=" + document.getElementById("location").value + "#tides";
+        }
+		var tide_loc = [];
+    </script>
+    <main>
+        <section id='home' class='darkbg'>
+            <div class='container p-3'>
+                <h1>Spearers, West End</h1>
+                <p>Since 2004, Spearers have paddled on the Brisbane River every Monday, Wednesday, and Friday from 5am to 6am.  We meet in the <a href='#mapsection'>Orleigh Park Carpark</a>. </p>
+                <p>We paddle in surfskis, ocean skis, and K1 kayaks.  We run a race called <a href='cheese.php'>The Cheese</a>: a 9-km course around <a href='https://goo.gl/maps/sdDeoHEhbGUynhx58'>The Rock</a>.</p>
+                <p>We do an annual pilgrimage to <a href='AGM.php'>The AGM</a> in November.  On holidays, we paddle from Breakfast Creek then head to our favourite spot, <a href='https://www.theblackalbion.com.au/'>The Black</a>.</p>
+                <p><b>All are welcome!</b>  <a href='#contact'>Contact us</a> to join us and try out one of our club skis.</p>
+            </div>
+        </section>
+        
+        <section id='tides' class='whitebg'>
+            <div class='container p-3'>
+                <h2>Tides and Weather</h2>
+                <table><tr>
+                    <td>Predicted tides at </td>
+                    <td><form id="redirectForm">
+                        <select class="form-select" id="location" onchange="redirect()">
+                            <option value="westend">West End</option>
+                            <option value="breakfast" >Breakfast Creek</option>
+                            <option value="manly" >Manly</option>
+                            <option value="noosa" >Noosa</option>
+                            <option value="coomera" >Coomera</option>
+                        </select>
+                    </form></td>
+                </tr></table>
+                <p>All times in AEST (UTC+10)</p>
+            </div>
+            <div class='container-fluid' id='canvasScroll' style='width:100%;overflow-x:scroll;overflow-y:hidden;'>
+                <canvas id='myCanvas' width='7200'></canvas>
+            </div>
+            <div class='container p-3'>
+                Data Sources:
+                <ul>
+                    <li><a href='http://www.bom.gov.au/australia/tides/#!/qld-brisbane-port-office'>BOM Tide Predictions</a></li>
+                    <li><a href='http://www.bom.gov.au/fwo/IDQ65389/IDQ65389.540683.tbl.shtml'>Actual River Heights in St-Lucia</a></li>
+                    <li><a href='https://open-meteo.com/en/docs#latitude=-27.4679&amp;longitude=153.0281&amp;hourly=temperature_2m,precipitation_probability,wind_speed_10m,wind_direction_10m&amp;timezone=Australia%2FBrisbane'>Open-Meteo Free Weather API</a></li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id='calendarsection' class='graybg'>
+            <div class='container p-3'>
+                <h2>Calendar</h2>
+                <p>Predicted daylight in Brisbane from 5-6am. <br><strong>Legend:</strong></p>
+                <table class='calendar'><tr>
+                    <td class='today'>Today</td>
+                    <td class='daypaddle'>Day paddle</td>
+                    <td class='dawnpaddle'>Dawn paddle</td>
+                    <td class='nightpaddle'>Night paddle</td>
+                    <td class='goodday'>Good tide</td>
+                </tr></table>
+                <br>
+            </div>
+            <div class='container-fluid' style='width:100%;height:300px;overflow-x:hidden;overflow-y:scroll;padding:0px;'>
+                <table class='calendar' style='table-layout:fixed;' id='calendar'>
+                    <thead><tr>
+                        <th>Sun</th>
+                        <th>Mon</th>
+                        <th>Tue</th>
+                        <th>Wed</th>
+                        <th>Thu</th>
+                        <th>Fri</th>
+                        <th>Sat</th>
+                    </tr></thead>
+                    <tbody>
+                        <!-- JavaScript will populate this section -->
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <section id='mapsection' class='whitebg'>
+            <div class='container p-3'>
+                <h2>Map at <span id='loc'>West End</span></h2>
+				Tide is <span id='tideStats'></span>
+				Current wind is from <span id='windDir'>---</span>° at <span id='windSpd'>-</span> kph, temperature <span id='temp'>--</span>°C, precipitation <span id='precip'>-</span> mm. 
+                <div id='map'></div>
+				<canvas id="overlayCanvas"></canvas>
+            </div>
+        </section>
+       
+        <section id='links' class='darkbg'>
+            <div class='container p-3'>
+                <h2>Links</h2>
+                <ul>
+                    <li><a href="https://www.msq.qld.gov.au/tmr_site_msq/_/media/tmronline/msqinternet/msqfiles/home/waterways/on-water-conduct-bris-river/brisbane_river_code_conduct.pdf">Brisbane River Code</a></li>
+                    <li><a href="https://www.strava.com/clubs/41135">Spearers on Strava</a></li>
+                    <li><a href="https://www.olympics.com.au/sports/canoe-kayak/">Olympic Canoe Slalom / Canoe Sprint</a></li>
+                    <li><a href="https://paddle.org.au/">Paddle Australia</a></li>
+                    <li><a href="https://australianpaddlesports.com.au/">Australian Paddle Sports</a></li>
+                    <li><a href="https://www.youtube.com/@ultimatekayaks6499">Ivan Lawler videos</a></li>
+                    <li><a href="https://westend.paddle.org.au/">West End Canoe Club</a></li>
+                    <li><a href="https://surfski.info/forum/19-boats/19935-vajda-makai-43-elite-vs-epic-v11-elite.html">Vajda Makai 43 Elite vs Epic v11 Elite</a></li>
+                    <li><a href="https://stravaheatmap.pythonanywhere.com/">Strava Heatmap</a></li>
+                    <li><a href="https://www.theblackalbion.com.au/">The Black</a></li>
+                    <li><a href="https://www.youtube.com/watch?v=9QFrcrjJ95I">Ken Wallace's Gold Beijing 2008</a></li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id='contact' class='graybg'>
+            <div class='container p-3'>
+                <h2>Contact Us</h2>
+                    <form action='contact-us.php' method='post'>
+                        <div class="d-grid gap-3">
+                            <input class='form-control' type='text' id='name' name='name' placeholder='Enter name' required>
+                            <input class='form-control' type='email' id='email' name='email' placeholder='Enter email' required>
+                            <input class='form-control' type='tel' id='phone' name='phone' placeholder='Telephone' required>
+                            <textarea class='form-control' id='message' name='message' rows='4' placeholder='Enter Message' required></textarea>
+                            <input class='btn' type='submit' value='Submit'>
+                        </div>
+                    </form>
+            </div>
+        </section>
+    </main>
+
+    <footer class='darkbg'>
+        <div class='container' style='padding:0;'>
+            <table class='calendar' style='table-layout: auto;'><thead><tr>
+                <th><a href='/#home'>Home</a> </th>
+                <th><a href='/#tides'>Tides</a> </th>
+                <th><a href='cheese.php#cheese'>Cheese</a> </th>
+                <th><a href='photos.php#home'>Photos</a> </th>
+                <th><a href='AGM.php#AGM'>AGM</a></th>
+                <th><a href='/#mapsection'>Map</a> </th>
+                <th><a href='/#contact'>Contact</a> </th>
+            </tr></thead></table>
+            <br>
+            <div class='row'>
+                <div class='col'>
+                    <a class='navbar-brand' href='/'><img src='images/SpearersLogoClearDark.png' class='d-block' alt='Logo' width='200'></a>
+                </div>
+                <div class='col'>
+                    <p>&copy; 2023 Spearers. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Load in Leaflet maps scripts -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/polyline-encoded@0.0.9/Polyline.encoded.min.js"></script>
+	<script>
+		var map = L.map('map').setView([-27.488299, 152.996411], 15);
+	</script>
+
+    <!-- because we can't load the JS inline above, we'll have to read all the tide_list data into a single tides.js file for all locations -->
+    <script src='tide_list.js?v=1'></script>   <!-- 0=westend,1=breakfast,2=coomera,3=manly,4=noosa -->
+
+    <script>
+		function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+        // Get the 'loc' parameter from the URL
+        var loc = getUrlParameter('loc');
+		if (!loc) loc = 'westend';
+
+		document.getElementById('loc').innerHTML = loc;
+		document.getElementById('location').value = loc;
+		
+		var coords,url,delta,adjust;
+		var tide_list = [];
+		if (loc == 'westend') {
+			coords = [-27.488299,152.996411];
+			tide_list = tide_loc[0];
+			url = "http://www.bom.gov.au/fwo/IDQ65389/IDQ65389.540683.tbl.shtml";
+			delta = 1;
+			adjust = 0.35;
+		} else if (loc == 'breakfast') {
+			coords = [-27.43754,153.04233];
+			tide_list = tide_loc[1];
+			url = "http://www.bom.gov.au/fwo/IDQ65389/IDQ65389.540685.tbl.shtml";
+			delta = 1;
+			adjust = -0.35;
+		} else if (loc == 'coomera') {
+			coords = [-27.84684,153.35987];
+			tide_list = tide_loc[2];
+			url = "http://www.bom.gov.au/fwo/IDQ65388/IDQ65388.540269.tbl.shtml";   //"http://www.bom.gov.au/fwo/IDQ65388/IDQ65388.540673.tbl.shtml";
+			delta = 0.5;
+			adjust = 0.9;
+		} else if (loc == 'manly') {
+			coords = [-27.45777,153.19250];
+			tide_list = tide_loc[3];
+			url = "http://www.bom.gov.au/fwo/IDQ65389/IDQ65389.540495.tbl.shtml";
+			delta = 1.2;
+			adjust = 0.0;
+		} else if (loc == 'noosa') {
+			coords = [-26.387749,153.089658];
+			tide_list = tide_loc[4];
+			url = "http://www.bom.gov.au/fwo/IDQ65390/IDQ65390.540311.tbl.shtml";
+			delta = 1;
+			adjust = 0.0;
+		} else {
+			redirect();
+		}
+
+		//need to set these up from a php call
+		var meteo = false;
+		var river = false;
+		var forecast;
+		var windDirNow = 0;
+		var windSpdNow = 0;
+		var tempNow = 0;
+		var precipNow = 0;
+		var riverData;
+		
+    </script>
+	
+    <script src="suncalc.js"></script>
+
+    <!-- load in my spearers scripts -->
+    <script src='events.js?v=1'></script>
+    <script src='tides.js?v=1'></script>
+    <script src='calendar.js?v=1'></script>
+<!--    <script src='mapdata.js?v=2'></script>  -->
+    <script src='map.js?v=3'></script>
+    <script>
+		const canvasHeight = 350;
+		document.getElementById('canvasScroll').height = canvasHeight;
+		document.getElementById('myCanvas').height = canvasHeight;
+
+        //now display all data from javascript files
+        adjustTides();      //add a timestamp field, and add/subtract a bit to adjust tides for current (change this per location)
+        generateCalendar(coords); //populate the calendar table tbody - functions in calendar.js
+        drawCurve(coords, true);        //populate the tides canvas - functions in tides.js
+        document.getElementById('canvasScroll').scrollLeft = document.getElementById('myCanvas').width * 6.66 / 20;        //adjust scrollbar
+
+        // Draw the map centered on westend, breakfast, manly, coomera, noosa
+        plotMap([], loc);  //instead of [], put data
+
+		// Create a canvas overlay aligned with the map
+		const overlayCanvas = document.getElementById('overlayCanvas');
+		const mapContainer = map.getContainer();
+		const ctxm = overlayCanvas.getContext('2d');
+    </script>
+	<script src='rivers/setupFlowAreas.js?v=2'></script>
+	<script src='rivers/rivers.js?v=2'></script>
+	<script src='rivers/riverPoints.js'></script>
+	<script>
+		// in this section, setup and draw the Flows and the Barbs, and manage all animations and actions on window changes
+
+		const currentDate = new Date();
+		var t = currentDate.getTime();
+		var tideHeightSpd = -Math.round((tideHeight(t + 1*3600*1000) - tideHeight(t))*100)*10;	//mm/hr
+		var msg = (tideHeightSpd  < -100) ? 'INCOMING' : (tideHeightSpd  > 100) ? 'OUTGOING' : 'NEUTRAL';
+		document.getElementById('tideStats').innerHTML = Math.round(tideHeight(t)*10)/10 + ' m ' + msg + ' at ' + Math.abs(tideHeightSpd) + ' mm/hr.';
+		
+		//load the riverPoints array to plot the flows
+		var riverPoints = JSON.parse(loadStr);
+
+		//river Flows constants
+		const numFlows = 400; // Number of flows in the simulation
+		const flowFactor = 10; // Factor to determine progression incremenet of the arc based on flow speed
+		const flowDuration = 2;  //seconds
+		//wind barbs constants
+		const numBarbs = 400;  //Number of windbarbs in the simulation
+		const barbSpdFactor = 5;
+		const barbLenFactor = 3;
+		const barbDuration = 2; //seconds
+
+		//populate this array with all quadrangles, directions, maxFlow, tideStns... everything we need to plot the animations, then we won't need to use riverPoints anymore
+		var ctxAreas = [];  
+		var flows = [];  // Array to hold river flow objects
+		var barbs = [];  // Array to hold wind barb objects
+
+		// Function to update and redraw flows and barbs at a specified interval
+		function animate() {
+			ctxm.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+			updateFlowPositions(); // Update river flow positions
+			updateBarbPositions(); // Update wind barb positions
+			drawFlows(); // Redraw flows
+			drawBarbs();
+			requestAnimationFrame(animate); // Request next animation frame
+		}
+
+		// Initial drawing on canvas, and populate the ctxAreas array with all info we need to run the animations
+		setupFlowAreas();
+
+		// Initialize flows and start animation
+		initializeFlows();
+		InitializeBarbs();
+		animate();
+
+		// Align the canvas again
+		alignCanvas();
+		window.onresize = alignCanvas;
+		
+		// Once done loading, load the weather and the river heights
+		window.onload = function() {
+			fetchWxData();
+			fetchRiverHeights();
+		};
+	</script>
+</body>
+</html>
